@@ -1,0 +1,20 @@
+- name: install required packages
+  apt: name={{ item }} state=present update_cache=yes
+  with_items:
+    - vim
+    - postgresql
+    - nginx
+    - python
+    - mailutils
+    - sysstat
+
+- name: Copying monitor.sh file to the instance
+  copy: src=/tmp/monitor.sh dest=/usr/local/bin/
+
+- name: Creates Monitoring cronjob
+  cron: minute="5" 
+        name="Monitoring Postgres Instance"
+        cron_file="monitor"
+        user="root"
+        job="/usr/local/bin/monitor.sh"
+

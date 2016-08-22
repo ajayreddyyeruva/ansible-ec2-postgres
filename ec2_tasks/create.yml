@@ -1,0 +1,73 @@
+---
+# Basic provisioning example
+- name: Create AWS resources
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+  - name: Create security group
+    local_action:
+      module: ec2_group
+      name: postgres_ssh_fw
+      description: "postgres_ssh_fw"
+      region: "{{aws_region}}"
+      rules:
+        - proto: tcp
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 5432
+          to_port: 5432
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        - proto: all
+          cidr_ip: 0.0.0.0/0
+    register: postgres_ssh_fw 
+
+  - name: create postgres instance
+    local_action:
+      module: ec2
+      key_name: "{{key_name}}"
+      region: "{{aws_region}}"
+      #group_id: "{{rabbit_fw.group_id}}"
+      group: [ "default", "postgres_ssh_fw" ]
+      instance_type: "{{instance_type}}"
+      instance_tags:
+        group: postgres
+      count_tag: 
+        group: postgres
+      exact_count: 1
+      image: "{{ami_id}}"
+      wait: yes
+    register: ec2host_postgres
+
+  - name: setup the internal postgres ip script for userdata 
+    local_action: template src=worker_init_script.j2 dest=/tmp/init_worker.sh
+    with_items: ec2host_postgres.tagged_instances
+
+  - debug: var=ec2host_postgres
+
+  - add_host: hostname={{ item.public_ip }} groupname=postgres
+    with_items: ec2host_postgres.tagged_instances
+
+  # Can't combine these for some reason
+  - name: wait for  postgres instances to listen on port:22
+    wait_for: state=started host={{ item.public_ip }} port=22
+    with_items: ec2host_postgres.tagged_instances
+
+
+- name: configure the postgres
+  hosts: postgres
+  remote_user: ubuntu
+  sudo: true
+  roles:
+    - postgres
+
+
+
+
+
+
+
+

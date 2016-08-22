@@ -1,0 +1,4 @@
+key_name: ec2postgres
+aws_region: us-east-1
+ami_id: ami-9eaa1cf6
+instance_type: t2.micro
